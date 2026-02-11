@@ -18,7 +18,7 @@ input,select,textarea,button{font-family:inherit}
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useMemo}=React;
+const {useState,useMemo,useEffect}=React;
 const MEMBERS=["Alice Chen","Bob Wang","Carol Li","David Zhou","Eva Liu"];
 const STATUSES=["讨论中","执行中","已完成","已归档"];
 const PRIORITIES=["重要且紧急","重要不紧急","不重要但紧急","不重要不紧急"];
@@ -61,7 +61,15 @@ const PBar=({value,onChange,editable=true})=>{
 };
 
 function App(){
-  const[memos,setMemos]=useState(INIT);
+  const[memos,setMemos]=useState(()=>{
+    try{
+      const saved=localStorage.getItem("decision-discussions");
+      return saved?JSON.parse(saved):INIT;
+    }catch(e){
+      console.error("Failed to load data:",e);
+      return INIT;
+    }
+  });
   const[selId,setSelId]=useState(null);
   const[fS,setFS]=useState("all");
   const[fP,setFP]=useState("all");
@@ -72,6 +80,14 @@ function App(){
   const[todoT,setTodoT]=useState("");
   const[customOwner,setCustomOwner]=useState("");
   const[nm,setNm]=useState({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",participants:[],nextReview:"",deadline:"",progress:0});
+
+  React.useEffect(()=>{
+    try{
+      localStorage.setItem("decision-discussions",JSON.stringify(memos));
+    }catch(e){
+      console.error("Failed to save data:",e);
+    }
+  },[memos]);
   const sel=memos.find(m=>m.id===selId);
   const alerts=useMemo(()=>memos.filter(m=>m.status!=="已完成"&&(overdue(m.nextReview)||soon(m.nextReview))).sort((a,b)=>(a.nextReview||"9")>(b.nextReview||"9")?1:-1),[memos]);
   const list=useMemo(()=>memos.filter(m=>fS==="all"||m.status===fS).filter(m=>fP==="all"||m.priority===fP).sort((a,b)=>PRIORITIES.indexOf(a.priority)-PRIORITIES.indexOf(b.priority)||(b.createdAt>a.createdAt?1:-1)),[memos,fS,fP]);
@@ -83,6 +99,8 @@ function App(){
   const delTodo=id=>sel&&upd(sel.id,{todos:sel.todos.filter(t=>t.id!==id)});
   const delNote=id=>sel&&upd(sel.id,{notes:sel.notes.filter(n=>n.id!==id)});
   const create=()=>{if(!nm.topic.trim()||!nm.owner.trim())return;const m={id:++mid,...nm,status:"讨论中",createdAt:TODAY,todos:[],notes:[]};setMemos([m,...memos]);setSelId(m.id);setShowNew(false);setNm({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",participants:[],nextReview:"",deadline:"",progress:0});setCustomOwner("")};
+  const exportData=()=>{const data=JSON.stringify(memos,null,2);const blob=new Blob([data],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`discussions-backup-${TODAY}.json`;a.click();URL.revokeObjectURL(url)};
+  const importData=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const data=JSON.parse(ev.target.result);setMemos(data);alert("数据导入成功！")}catch(err){alert("导入失败：文件格式错误")}};reader.readAsText(file)};
 
   const I={border:"1px solid #d9d6d0",borderRadius:6,padding:"7px 10px",fontSize:13,outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"inherit",background:"#fff"};
   const SL={...I,appearance:"auto"};
@@ -99,6 +117,8 @@ function App(){
         <div><h1 style={{fontSize:16,fontWeight:700,margin:0}}>Decision Discussion Tracker</h1><span style={{fontSize:12,color:"#999"}}>投资决策讨论追踪</span></div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           {alerts.length>0&&<span style={{fontSize:12,color:"#cf1322",fontWeight:500}}>🔔 {alerts.length} 条待Review</span>}
+          <button onClick={exportData} style={{...BG,padding:"5px 12px",fontSize:12}} title="导出备份">💾 导出</button>
+          <label style={{...BG,padding:"5px 12px",fontSize:12,cursor:"pointer",margin:0}} title="导入数据">📥 导入<input type="file" accept=".json" onChange={importData} style={{display:"none"}}/></label>
           <button onClick={()=>{setShowNew(true);setSelId(null)}} style={BP}>+ 新建 Discussion</button>
         </div>
       </div>
