@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Decision Memo Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI','Noto Sans SC',sans-serif;background:#fafaf9;color:#1a1a1a}
+input,select,textarea,button{font-family:inherit}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useMemo}=React;
+const MEMBERS=["Alice Chen","Bob Wang","Carol Li","David Zhou","Eva Liu"];
+const STATUSES=["讨论中","执行中","已完成"];
+const PRIORITIES=["重要且紧急","重要不紧急","不重要但紧急","不重要不紧急"];
+const TODAY=new Date().toISOString().slice(0,10);
+const PM={"重要且紧急":{c:"#cf1322",b:"rgba(207,19,34,0.08)"},"重要不紧急":{c:"#d46b08",b:"rgba(212,107,8,0.07)"},"不重要但紧急":{c:"#096dd9",b:"rgba(9,109,217,0.07)"},"不重要不紧急":{c:"#8c8c8c",b:"rgba(140,140,140,0.06)"}};
+const SM={"讨论中":{c:"#d46b08",b:"rgba(212,107,8,0.07)",i:"◌"},"执行中":{c:"#096dd9",b:"rgba(9,109,217,0.07)",i:"▸"},"已完成":{c:"#389e0d",b:"rgba(56,158,13,0.07)",i:"✓"}};
+
+const INIT=[
+  {id:1,topic:"新兴市场敞口是否需要减仓至10%以下",conclusion:"分两批减仓至8%，保留5%底仓。第一批已完成，当前敞口11.2%。",limitingFactor:"尾盘流动性不足，大额减仓需分批执行，TWAP算法待上线。",priority:"重要且紧急",status:"执行中",progress:65,owner:"Alice Chen",participants:["Bob Wang","Carol Li"],nextReview:"2026-02-14",createdAt:"2026-01-10",deadline:"2026-02-28",
+    todos:[{id:1,text:"通知交易台准备减仓指令",done:true},{id:2,text:"确认流动性窗口",done:true},{id:3,text:"执行第二批减仓",done:false},{id:4,text:"更新持仓报告",done:false}],
+    notes:[{id:1,date:"2026-01-10",author:"Alice Chen",content:"新兴市场波动率突破90%分位，建议讨论是否减仓。当前敞口15%。",type:"normal"},{id:2,date:"2026-01-12",author:"Bob Wang",content:"同意减仓方向，但建议分批执行，避免冲击成本。目标10%以下。",type:"normal"},{id:3,date:"2026-01-15",author:"Carol Li",content:"估值已处低位，完全退出可能错过反弹。建议保留5%底仓。",type:"normal"},{id:4,date:"2026-01-18",author:"Alice Chen",content:"团队一致同意：分两批减仓至8%，保留底仓。第一批本周执行。",type:"decision"},{id:5,date:"2026-01-25",author:"Bob Wang",content:"第一批减仓完成，当前敞口11.2%。市场继续下行，验证了减仓判断。",type:"update"}]},
+  {id:2,topic:"固收久期策略：是否延长至3.5年",conclusion:"折中方案：目标久期3.2，分步调整。先到2.8观察一周。",limitingFactor:"合适久期的品种供给有限，需等待一级市场发行窗口。",priority:"重要不紧急",status:"执行中",progress:40,owner:"Bob Wang",participants:["Alice Chen","David Zhou"],nextReview:"2026-02-20",createdAt:"2026-01-20",deadline:"2026-03-15",
+    todos:[{id:1,text:"筛选合适的长久期品种",done:false},{id:2,text:"计算组合久期影响测算",done:true}],
+    notes:[{id:1,date:"2026-01-20",author:"Bob Wang",content:"利率见顶信号增强，建议将组合久期从2.1延长至3.5。预计可提升收益50bps。",type:"normal"},{id:2,date:"2026-01-22",author:"David Zhou",content:"3.5激进了，通胀韧性仍在。建议折中到3.0，留有余地。",type:"normal"},{id:3,date:"2026-01-28",author:"Bob Wang",content:"折中方案：目标久期3.2，分步调整。先到2.8观察一周再决定后续。",type:"decision"}]},
+  {id:3,topic:"科技板块集中度超限处理方案",conclusion:"",limitingFactor:"期权对冲成本较高（约0.8%），直接减仓可能造成价格冲击。",priority:"重要且紧急",status:"讨论中",progress:0,owner:"Carol Li",participants:["Alice Chen","Eva Liu"],nextReview:"2026-02-12",createdAt:"2026-02-05",deadline:"2026-02-15",
+    todos:[],
+    notes:[{id:1,date:"2026-02-05",author:"Carol Li",content:"科技板块占比已达37%，超过35%风控上限。需要尽快处理。",type:"normal"},{id:2,date:"2026-02-06",author:"Eva Liu",content:"建议对比两个方案：直接减仓 vs 用期权对冲。期权成本约0.8%。",type:"normal"}]},
+  {id:4,topic:"Q2 大类资产再平衡计划",conclusion:"",limitingFactor:"Q1数据尚未出完，需等待2月底宏观数据确认方向。",priority:"不重要但紧急",status:"讨论中",progress:0,owner:"David Zhou",participants:["Bob Wang","Carol Li","Eva Liu"],nextReview:"2026-03-01",createdAt:"2026-02-01",deadline:"2026-04-01",
+    todos:[{id:1,text:"准备Q1回顾报告",done:false}],
+    notes:[{id:1,date:"2026-02-01",author:"David Zhou",content:"Q2再平衡窗口在4月初，提前一个月开始讨论方向。初步想法：增配商品、减配成长股。",type:"normal"}]}
+];
+
+let nid=100,tid=100,mid=10;
+const Tag=({children,color,bg})=><span style={{display:"inline-flex",alignItems:"center",padding:"1px 8px",borderRadius:3,fontSize:11,fontWeight:600,color,background:bg,lineHeight:"20px",whiteSpace:"nowrap"}}>{children}</span>;
+const Av=({name,size=22})=>{const c=["#597ef7","#d46b08","#36cfc9","#f759ab","#389e0d","#ffd666"];return<span title={name} style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:size,height:size,borderRadius:"50%",fontSize:size*0.4,fontWeight:700,color:"#fff",background:c[name.charCodeAt(0)%c.length],flexShrink:0}}>{name.split(" ").map(n=>n[0]).join("")}</span>};
+const overdue=d=>d&&d<=TODAY;
+const soon=d=>d&&(new Date(d)-new Date(TODAY))/864e5<=3&&d>=TODAY;
+const daysLeft=d=>{if(!d)return null;return Math.ceil((new Date(d)-new Date(TODAY))/864e5)};
+
+const PBar=({value,onChange,editable=true})=>{
+  const v=Math.min(100,Math.max(0,value||0));
+  return <div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
+    <div style={{flex:1,height:8,borderRadius:4,background:"#e8e5e0",overflow:"hidden"}}>
+      <div style={{height:"100%",borderRadius:4,background:v>=100?"#389e0d":v>0?"#52c41a":"transparent",width:v+"%",transition:"width 0.3s"}}/>
+    </div>
+    {editable?<input type="number" min="0" max="100" value={value||0} onChange={e=>onChange(Math.min(100,Math.max(0,parseInt(e.target.value)||0)))}
+      style={{width:48,textAlign:"center",border:"1px solid #d9d6d0",borderRadius:4,padding:"2px 4px",fontSize:12,outline:"none",background:"#fff"}}/>
+    :<span style={{fontSize:12,fontWeight:600,color:v>=100?"#389e0d":"#555",minWidth:36,textAlign:"right"}}>{v}%</span>}
+  </div>
+};
+
+function App(){
+  const[memos,setMemos]=useState(INIT);
+  const[selId,setSelId]=useState(null);
+  const[fS,setFS]=useState("all");
+  const[fP,setFP]=useState("all");
+  const[showNew,setShowNew]=useState(false);
+  const[note,setNote]=useState("");
+  const[nType,setNType]=useState("normal");
+  const[todoT,setTodoT]=useState("");
+  const[nm,setNm]=useState({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:MEMBERS[0],participants:[],nextReview:"",deadline:"",progress:0});
+  const sel=memos.find(m=>m.id===selId);
+  const alerts=useMemo(()=>memos.filter(m=>m.status!=="已完成"&&(overdue(m.nextReview)||soon(m.nextReview))).sort((a,b)=>(a.nextReview||"9")>(b.nextReview||"9")?1:-1),[memos]);
+  const list=useMemo(()=>memos.filter(m=>fS==="all"||m.status===fS).filter(m=>fP==="all"||m.priority===fP).sort((a,b)=>PRIORITIES.indexOf(a.priority)-PRIORITIES.indexOf(b.priority)||(b.createdAt>a.createdAt?1:-1)),[memos,fS,fP]);
+  const upd=(id,u)=>setMemos(ms=>ms.map(m=>m.id===id?{...m,...u}:m));
+  const addNote=()=>{if(!note.trim()||!sel)return;upd(sel.id,{notes:[...sel.notes,{id:++nid,date:TODAY,author:sel.owner,content:note.trim(),type:nType}]});setNote("");setNType("normal")};
+  const addTodo=()=>{if(!todoT.trim()||!sel)return;upd(sel.id,{todos:[...sel.todos,{id:++tid,text:todoT.trim(),done:false}]});setTodoT("")};
+  const togTodo=id=>sel&&upd(sel.id,{todos:sel.todos.map(t=>t.id===id?{...t,done:!t.done}:t)});
+  const create=()=>{if(!nm.topic.trim())return;const m={id:++mid,...nm,status:"讨论中",createdAt:TODAY,todos:[],notes:[]};setMemos([m,...memos]);setSelId(m.id);setShowNew(false);setNm({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:MEMBERS[0],participants:[],nextReview:"",deadline:"",progress:0})};
+
+  const I={border:"1px solid #d9d6d0",borderRadius:6,padding:"7px 10px",fontSize:13,outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"inherit",background:"#fff"};
+  const SL={...I,appearance:"auto"};
+  const TA={...I,minHeight:48,resize:"vertical",lineHeight:1.5};
+  const BP={background:"#1a1a1a",color:"#fff",border:"none",borderRadius:6,padding:"7px 16px",fontSize:13,fontWeight:500,cursor:"pointer"};
+  const BG={background:"transparent",color:"#666",border:"1px solid #d9d6d0",borderRadius:6,padding:"7px 16px",fontSize:13,cursor:"pointer"};
+  const BS={background:"transparent",color:"#888",border:"1px solid #e8e5e0",borderRadius:4,padding:"3px 10px",fontSize:11,cursor:"pointer"};
+  const LB={fontSize:11,color:"#888",fontWeight:500,textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:4,display:"block"};
+  const NC={normal:{border:"#e8e5e0",label:""},decision:{border:"#597ef7",label:"决议",bg:"rgba(89,126,247,0.04)"},update:{border:"#d46b08",label:"更新",bg:"rgba(212,107,8,0.04)"},overturn:{border:"#cf1322",label:"推翻",bg:"rgba(207,19,34,0.04)"}};
+
+  return(
+    <div style={{background:"#fafaf9",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"14px 24px",borderBottom:"1px solid #e8e5e0",background:"#fff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div><h1 style={{fontSize:16,fontWeight:700,margin:0}}>Decision Memo Tracker</h1><span style={{fontSize:12,color:"#999"}}>投资决策讨论追踪</span></div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {alerts.length>0&&<span style={{fontSize:12,color:"#cf1322",fontWeight:500}}>🔔 {alerts.length} 条待Review</span>}
+          <button onClick={()=>{setShowNew(true);setSelId(null)}} style={BP}>+ 新建 Memo</button>
+        </div>
+      </div>
+
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+        {/* Sidebar */}
+        <div style={{width:400,borderRight:"1px solid #e8e5e0",background:"#fff",display:"flex",flexDirection:"column",flexShrink:0}}>
+          <div style={{padding:"10px 16px",borderBottom:"1px solid #f0ede8",display:"flex",gap:8,alignItems:"center"}}>
+            <select value={fS} onChange={e=>setFS(e.target.value)} style={{...SL,fontSize:12,padding:"4px 8px",width:"auto"}}><option value="all">全部状态</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
+            <select value={fP} onChange={e=>setFP(e.target.value)} style={{...SL,fontSize:12,padding:"4px 8px",width:"auto"}}><option value="all">全部优先度</option>{PRIORITIES.map(p=><option key={p}>{p}</option>)}</select>
+            <span style={{fontSize:11,color:"#aaa",marginLeft:"auto"}}>{list.length}</span>
+          </div>
+          {alerts.length>0&&<div style={{padding:"10px 16px",background:"rgba(207,19,34,0.03)",borderBottom:"1px solid #f0ede8"}}>
+            <div style={{fontSize:11,fontWeight:600,color:"#cf1322",marginBottom:6}}>⏰ 需要 Review</div>
+            {alerts.slice(0,3).map(m=><div key={m.id} onClick={()=>{setSelId(m.id);setShowNew(false)}} style={{fontSize:12,color:"#666",padding:"3px 0",cursor:"pointer",display:"flex",justifyContent:"space-between"}}>
+              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:250}}>{m.topic}</span>
+              <span style={{color:overdue(m.nextReview)?"#cf1322":"#d46b08",fontSize:11,flexShrink:0,marginLeft:8}}>{overdue(m.nextReview)?"已过期":m.nextReview}</span>
+            </div>)}
+          </div>}
+          <div style={{flex:1,overflow:"auto"}}>
+            {list.map(m=>{const dl=daysLeft(m.deadline);return(
+              <div key={m.id} onClick={()=>{setSelId(m.id);setShowNew(false)}}
+                style={{padding:"14px 16px",borderBottom:"1px solid #f0ede8",cursor:"pointer",background:selId===m.id?"#f5f3ef":"transparent",transition:"background 0.1s"}}
+                onMouseEnter={e=>{if(selId!==m.id)e.currentTarget.style.background="#faf8f5"}}
+                onMouseLeave={e=>{if(selId!==m.id)e.currentTarget.style.background="transparent"}}>
+                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+                  <Tag color={PM[m.priority].c} bg={PM[m.priority].b}>{m.priority}</Tag>
+                  <Tag color={SM[m.status].c} bg={SM[m.status].b}>{SM[m.status].i} {m.status}</Tag>
+                  {(overdue(m.nextReview)||soon(m.nextReview))&&m.status!=="已完成"&&<span style={{fontSize:10,color:"#cf1322"}}>⏰</span>}
+                </div>
+                <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a",marginBottom:8,lineHeight:1.4}}>{m.topic}</div>
+                <div style={{marginBottom:8}}><PBar value={m.progress} editable={false}/></div>
+                <div style={{display:"flex",gap:12,alignItems:"center",fontSize:12,color:"#999"}}>
+                  <span style={{display:"flex",alignItems:"center",gap:4}}><Av name={m.owner} size={16}/>{m.owner.split(" ")[0]}</span>
+                  {m.deadline&&<span style={{color:dl!==null&&dl<0?"#cf1322":dl!==null&&dl<=7?"#d46b08":"#999"}}>{dl!==null&&dl<0?`逾期${Math.abs(dl)}天`:dl!==null?`剩${dl}天`:""}</span>}
+                  <span>{m.notes.length} 讨论</span>
+                </div>
+              </div>
+            )})}
+          </div>
+        </div>
+
+        {/* Main */}
+        <div style={{flex:1,overflow:"auto",background:"#fafaf9"}}>
+          {!sel&&!showNew&&<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",color:"#ccc",fontSize:14}}>← 选择一条 Memo</div>}
+
+          {/* New */}
+          {showNew&&<div style={{maxWidth:600,margin:"28px auto",padding:"0 24px"}}>
+            <h2 style={{fontSize:18,fontWeight:700,marginBottom:20}}>新建 Decision Memo</h2>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div><label style={LB}>讨论内容</label><input value={nm.topic} onChange={e=>setNm({...nm,topic:e.target.value})} style={I} placeholder="这个决策要讨论什么？" autoFocus/></div>
+              <div><label style={LB}>结论（可稍后填写）</label><textarea value={nm.conclusion} onChange={e=>setNm({...nm,conclusion:e.target.value})} style={TA} placeholder="讨论后的结论..."/></div>
+              <div><label style={LB}>Limiting Factor</label><textarea value={nm.limitingFactor} onChange={e=>setNm({...nm,limitingFactor:e.target.value})} style={TA} placeholder="制约因素、瓶颈、风险..."/></div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div><label style={LB}>优先度</label><select value={nm.priority} onChange={e=>setNm({...nm,priority:e.target.value})} style={{...SL,width:"100%"}}>{PRIORITIES.map(p=><option key={p}>{p}</option>)}</select></div>
+                <div><label style={LB}>负责人</label><select value={nm.owner} onChange={e=>setNm({...nm,owner:e.target.value})} style={{...SL,width:"100%"}}>{MEMBERS.map(m=><option key={m}>{m}</option>)}</select></div>
+              </div>
+              <div><label style={LB}>参与人</label><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {MEMBERS.filter(m=>m!==nm.owner).map(m=>{const on=(nm.participants||[]).includes(m);return<button key={m} onClick={()=>setNm({...nm,participants:on?nm.participants.filter(p=>p!==m):[...(nm.participants||[]),m]})} style={{...BS,background:on?"#1a1a1a":"transparent",color:on?"#fff":"#888",borderColor:on?"#1a1a1a":"#e8e5e0"}}>{m}</button>})}
+              </div></div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div><label style={LB}>截止日期</label><input type="date" value={nm.deadline||""} onChange={e=>setNm({...nm,deadline:e.target.value})} style={I}/></div>
+                <div><label style={LB}>下次 Review</label><input type="date" value={nm.nextReview} onChange={e=>setNm({...nm,nextReview:e.target.value})} style={I}/></div>
+              </div>
+              <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
+                <button onClick={()=>setShowNew(false)} style={BG}>取消</button>
+                <button onClick={create} style={BP}>创建</button>
+              </div>
+            </div>
+          </div>}
+
+          {/* Detail */}
+          {sel&&!showNew&&<div style={{maxWidth:720,margin:"0 auto",padding:"28px 24px"}}>
+            {/* Priority + Status */}
+            <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10}}>
+              <select value={sel.priority} onChange={e=>upd(sel.id,{priority:e.target.value})} style={{border:"none",fontSize:11,fontWeight:600,color:PM[sel.priority].c,background:PM[sel.priority].b,borderRadius:3,padding:"2px 8px",cursor:"pointer",outline:"none"}}>{PRIORITIES.map(p=><option key={p}>{p}</option>)}</select>
+              <select value={sel.status} onChange={e=>upd(sel.id,{status:e.target.value})} style={{border:"none",fontSize:11,fontWeight:600,color:SM[sel.status].c,background:SM[sel.status].b,borderRadius:3,padding:"2px 8px",cursor:"pointer",outline:"none"}}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
+            </div>
+
+            {/* 1. 讨论内容 */}
+            <h2 style={{fontSize:20,fontWeight:700,margin:"0 0 16px",lineHeight:1.4}}>{sel.topic}</h2>
+
+            {/* 2. 结论 */}
+            <div style={{background:sel.conclusion?"rgba(89,126,247,0.04)":"#fff",border:"1px solid "+(sel.conclusion?"#597ef7":"#e8e5e0"),borderRadius:8,padding:"12px 14px",marginBottom:10,borderLeftWidth:3,borderLeftStyle:"solid",borderLeftColor:sel.conclusion?"#597ef7":"#d9d6d0"}}>
+              <div style={{fontSize:11,fontWeight:600,color:"#597ef7",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:4}}>结论</div>
+              <textarea value={sel.conclusion||""} onChange={e=>upd(sel.id,{conclusion:e.target.value})} placeholder="讨论后填写结论..." style={{border:"none",background:"transparent",width:"100%",fontSize:13,color:"#333",lineHeight:1.6,resize:"none",outline:"none",minHeight:32,fontFamily:"inherit"}}/>
+            </div>
+
+            {/* 3. Limiting Factor */}
+            <div style={{background:sel.limitingFactor?"rgba(207,19,34,0.03)":"#fff",border:"1px solid "+(sel.limitingFactor?"#ff7875":"#e8e5e0"),borderRadius:8,padding:"12px 14px",marginBottom:14,borderLeftWidth:3,borderLeftStyle:"solid",borderLeftColor:sel.limitingFactor?"#cf1322":"#d9d6d0"}}>
+              <div style={{fontSize:11,fontWeight:600,color:"#cf1322",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:4}}>Limiting Factor</div>
+              <textarea value={sel.limitingFactor||""} onChange={e=>upd(sel.id,{limitingFactor:e.target.value})} placeholder="制约因素、瓶颈..." style={{border:"none",background:"transparent",width:"100%",fontSize:13,color:"#333",lineHeight:1.6,resize:"none",outline:"none",minHeight:32,fontFamily:"inherit"}}/>
+            </div>
+
+            {/* 4. 时间表 */}
+            <div style={{background:"#f6ffed",border:"1.5px solid #b7eb8f",borderRadius:10,padding:"16px 18px",marginBottom:24}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#389e0d"}}>📅 时间表</div>
+                {(()=>{const dl=daysLeft(sel.deadline);if(dl===null)return null;return<span style={{fontSize:13,fontWeight:700,color:dl<0?"#cf1322":dl<=3?"#d46b08":dl<=7?"#fa8c16":"#389e0d"}}>{dl<0?`⚠ 已逾期 ${Math.abs(dl)} 天`:dl===0?"⚡ 今天截止":`剩余 ${dl} 天`}</span>})()}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+                <div><div style={{fontSize:11,color:"#888",marginBottom:3}}>创建日期</div><div style={{fontSize:13,fontWeight:600,color:"#555"}}>{sel.createdAt}</div></div>
+                <div><div style={{fontSize:11,color:"#888",marginBottom:3}}>截止日期</div><input type="date" value={sel.deadline||""} onChange={e=>upd(sel.id,{deadline:e.target.value})} style={{border:"1px solid #b7eb8f",borderRadius:4,padding:"3px 6px",fontSize:13,fontWeight:600,color:"#333",background:"#fff",outline:"none",fontFamily:"inherit"}}/></div>
+                <div><div style={{fontSize:11,color:"#888",marginBottom:3}}>下次 Review</div><input type="date" value={sel.nextReview||""} onChange={e=>upd(sel.id,{nextReview:e.target.value})} style={{border:"1px solid "+(overdue(sel.nextReview)?"#ff7875":"#b7eb8f"),borderRadius:4,padding:"3px 6px",fontSize:13,fontWeight:600,color:overdue(sel.nextReview)?"#cf1322":"#333",background:overdue(sel.nextReview)?"#fff1f0":"#fff",outline:"none",fontFamily:"inherit"}}/>{overdue(sel.nextReview)&&<div style={{fontSize:10,color:"#cf1322",fontWeight:600,marginTop:2}}>已过期!</div>}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:12,fontWeight:600,color:"#389e0d",flexShrink:0}}>进度</span>
+                <PBar value={sel.progress} onChange={v=>upd(sel.id,{progress:v})}/>
+              </div>
+            </div>
+
+            {/* Meta */}
+            <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13,color:"#888",marginBottom:24,paddingBottom:16,borderBottom:"1px solid #f0ede8"}}>
+              <span style={{display:"flex",alignItems:"center",gap:5}}><span style={{color:"#bbb",fontSize:11}}>负责人</span><Av name={sel.owner} size={18}/><span style={{color:"#555"}}>{sel.owner}</span></span>
+              {sel.participants.length>0&&<span style={{display:"flex",alignItems:"center",gap:4}}><span style={{color:"#bbb",fontSize:11}}>参与</span>{sel.participants.map(p=><Av key={p} name={p} size={18}/>)}</span>}
+            </div>
+
+            {/* Todos */}
+            <div style={{marginBottom:28}}>
+              <h3 style={{fontSize:12,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:10}}>执行清单 {sel.todos.length>0&&`(${sel.todos.filter(t=>t.done).length}/${sel.todos.length})`}</h3>
+              {sel.todos.map(t=><div key={t.id} onClick={()=>togTodo(t.id)} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 0",cursor:"pointer",fontSize:13}}>
+                <span style={{width:16,height:16,borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",border:t.done?"none":"1.5px solid #d0cdc7",background:t.done?"#1a1a1a":"transparent",color:"#fff",fontSize:10,flexShrink:0}}>{t.done&&"✓"}</span>
+                <span style={{color:t.done?"#bbb":"#333",textDecoration:t.done?"line-through":"none"}}>{t.text}</span>
+              </div>)}
+              <div style={{display:"flex",gap:6,marginTop:8}}>
+                <input value={todoT} onChange={e=>setTodoT(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTodo()} placeholder="添加执行事项..." style={{...I,flex:1,fontSize:12}}/>
+                <button onClick={addTodo} style={BS}>添加</button>
+              </div>
+            </div>
+
+            {/* Timeline */}
+            <div>
+              <h3 style={{fontSize:12,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:14}}>讨论时间线 ({sel.notes.length})</h3>
+              <div style={{position:"relative",paddingLeft:20}}>
+                <div style={{position:"absolute",left:5,top:8,bottom:0,width:1,background:"#e8e5e0"}}/>
+                {sel.notes.map(n=>{const nc=NC[n.type]||NC.normal;const dot=n.type==="decision"?"#597ef7":n.type==="overturn"?"#cf1322":n.type==="update"?"#d46b08":"#d0cdc7";return(
+                  <div key={n.id} style={{position:"relative",marginBottom:16}}>
+                    <div style={{position:"absolute",left:-19,top:8,width:9,height:9,borderRadius:"50%",background:dot,border:"2px solid #fafaf9"}}/>
+                    <div style={{background:nc.bg||"#fff",border:`1px solid ${nc.border}`,borderRadius:8,padding:"12px 14px",borderLeftWidth:n.type!=="normal"?3:1,borderLeftStyle:"solid"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6}}><Av name={n.author} size={18}/><span style={{fontSize:12,fontWeight:600,color:"#555"}}>{n.author}</span>{nc.label&&<Tag color={nc.border} bg={nc.bg||"transparent"}>{nc.label}</Tag>}</div>
+                        <span style={{fontSize:11,color:"#bbb"}}>{n.date}</span>
+                      </div>
+                      <div style={{fontSize:13,color:"#333",lineHeight:1.65,whiteSpace:"pre-wrap"}}>{n.content}</div>
+                    </div>
+                  </div>
+                )})}
+              </div>
+              <div style={{marginTop:16,paddingLeft:20}}>
+                <div style={{display:"flex",gap:6,marginBottom:8}}>
+                  {[{k:"normal",l:"讨论"},{k:"decision",l:"📌 决议"},{k:"update",l:"🔄 更新"},{k:"overturn",l:"⚠️ 推翻"}].map(t=><button key={t.k} onClick={()=>setNType(t.k)} style={{...BS,fontSize:12,background:nType===t.k?"#1a1a1a":"transparent",color:nType===t.k?"#fff":"#888",borderColor:nType===t.k?"#1a1a1a":"#e8e5e0"}}>{t.l}</button>)}
+                </div>
+                <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder={nType==="decision"?"记录团队最终决议...":nType==="overturn"?"说明推翻之前结论的原因...":nType==="update"?"更新最新进展...":"添加讨论内容..."} onKeyDown={e=>{if(e.key==="Enter"&&e.metaKey)addNote()}} style={{...I,minHeight:64,resize:"vertical",lineHeight:1.6}}/>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+                  <span style={{fontSize:11,color:"#ccc"}}>⌘+Enter 发送</span>
+                  <button onClick={addNote} style={BP}>添加笔记</button>
+                </div>
+              </div>
+            </div>
+          </div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>
