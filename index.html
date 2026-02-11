@@ -20,11 +20,11 @@ input,select,textarea,button{font-family:inherit}
 <script type="text/babel">
 const {useState,useMemo}=React;
 const MEMBERS=["Alice Chen","Bob Wang","Carol Li","David Zhou","Eva Liu"];
-const STATUSES=["讨论中","执行中","已完成"];
+const STATUSES=["讨论中","执行中","已完成","已归档"];
 const PRIORITIES=["重要且紧急","重要不紧急","不重要但紧急","不重要不紧急"];
 const TODAY=new Date().toISOString().slice(0,10);
 const PM={"重要且紧急":{c:"#cf1322",b:"rgba(207,19,34,0.08)"},"重要不紧急":{c:"#d46b08",b:"rgba(212,107,8,0.07)"},"不重要但紧急":{c:"#096dd9",b:"rgba(9,109,217,0.07)"},"不重要不紧急":{c:"#8c8c8c",b:"rgba(140,140,140,0.06)"}};
-const SM={"讨论中":{c:"#d46b08",b:"rgba(212,107,8,0.07)",i:"◌"},"执行中":{c:"#096dd9",b:"rgba(9,109,217,0.07)",i:"▸"},"已完成":{c:"#389e0d",b:"rgba(56,158,13,0.07)",i:"✓"}};
+const SM={"讨论中":{c:"#d46b08",b:"rgba(212,107,8,0.07)",i:"◌"},"执行中":{c:"#096dd9",b:"rgba(9,109,217,0.07)",i:"▸"},"已完成":{c:"#389e0d",b:"rgba(56,158,13,0.07)",i:"✓"},"已归档":{c:"#8c8c8c",b:"rgba(140,140,140,0.06)",i:"□"}};
 
 const INIT=[
   {id:1,topic:"新兴市场敞口是否需要减仓至10%以下",conclusion:"分两批减仓至8%，保留5%底仓。第一批已完成，当前敞口11.2%。",limitingFactor:"尾盘流动性不足，大额减仓需分批执行，TWAP算法待上线。",priority:"重要且紧急",status:"执行中",progress:65,owner:"Alice Chen",participants:["Bob Wang","Carol Li"],nextReview:"2026-02-14",createdAt:"2026-01-10",deadline:"2026-02-28",
@@ -70,18 +70,19 @@ function App(){
   const[note,setNote]=useState("");
   const[nType,setNType]=useState("normal");
   const[todoT,setTodoT]=useState("");
-  const[nm,setNm]=useState({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:MEMBERS[0],participants:[],nextReview:"",deadline:"",progress:0});
+  const[customOwner,setCustomOwner]=useState("");
+  const[nm,setNm]=useState({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",participants:[],nextReview:"",deadline:"",progress:0});
   const sel=memos.find(m=>m.id===selId);
   const alerts=useMemo(()=>memos.filter(m=>m.status!=="已完成"&&(overdue(m.nextReview)||soon(m.nextReview))).sort((a,b)=>(a.nextReview||"9")>(b.nextReview||"9")?1:-1),[memos]);
   const list=useMemo(()=>memos.filter(m=>fS==="all"||m.status===fS).filter(m=>fP==="all"||m.priority===fP).sort((a,b)=>PRIORITIES.indexOf(a.priority)-PRIORITIES.indexOf(b.priority)||(b.createdAt>a.createdAt?1:-1)),[memos,fS,fP]);
   const upd=(id,u)=>setMemos(ms=>ms.map(m=>m.id===id?{...m,...u}:m));
-  const del=(id)=>{if(!confirm("确定要删除这条 Discussion 吗？"))return;setMemos(ms=>ms.filter(m=>m.id!==id));setSelId(null)};
+  const archive=(id)=>{if(!confirm("确定要归档这条 Discussion 吗？"))return;upd(id,{status:"已归档"});setSelId(null)};
   const addNote=()=>{if(!note.trim()||!sel)return;upd(sel.id,{notes:[...sel.notes,{id:++nid,date:TODAY,author:sel.owner,content:note.trim(),type:nType}]});setNote("");setNType("normal")};
   const addTodo=()=>{if(!todoT.trim()||!sel)return;upd(sel.id,{todos:[...sel.todos,{id:++tid,text:todoT.trim(),done:false}]});setTodoT("")};
   const togTodo=id=>sel&&upd(sel.id,{todos:sel.todos.map(t=>t.id===id?{...t,done:!t.done}:t)});
   const delTodo=id=>sel&&upd(sel.id,{todos:sel.todos.filter(t=>t.id!==id)});
   const delNote=id=>sel&&upd(sel.id,{notes:sel.notes.filter(n=>n.id!==id)});
-  const create=()=>{if(!nm.topic.trim())return;const m={id:++mid,...nm,status:"讨论中",createdAt:TODAY,todos:[],notes:[]};setMemos([m,...memos]);setSelId(m.id);setShowNew(false);setNm({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:MEMBERS[0],participants:[],nextReview:"",deadline:"",progress:0})};
+  const create=()=>{if(!nm.topic.trim()||!nm.owner.trim())return;const m={id:++mid,...nm,status:"讨论中",createdAt:TODAY,todos:[],notes:[]};setMemos([m,...memos]);setSelId(m.id);setShowNew(false);setNm({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",participants:[],nextReview:"",deadline:"",progress:0});setCustomOwner("")};
 
   const I={border:"1px solid #d9d6d0",borderRadius:6,padding:"7px 10px",fontSize:13,outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"inherit",background:"#fff"};
   const SL={...I,appearance:"auto"};
@@ -153,7 +154,21 @@ function App(){
               <div><label style={LB}>Limiting Factor</label><textarea value={nm.limitingFactor} onChange={e=>setNm({...nm,limitingFactor:e.target.value})} style={TA} placeholder="制约因素、瓶颈、风险..."/></div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                 <div><label style={LB}>优先度</label><select value={nm.priority} onChange={e=>setNm({...nm,priority:e.target.value})} style={{...SL,width:"100%"}}>{PRIORITIES.map(p=><option key={p}>{p}</option>)}</select></div>
-                <div><label style={LB}>负责人</label><select value={nm.owner} onChange={e=>setNm({...nm,owner:e.target.value})} style={{...SL,width:"100%"}}>{MEMBERS.map(m=><option key={m}>{m}</option>)}</select></div>
+                <div>
+                  <label style={LB}>负责人</label>
+                  <div style={{position:"relative"}}>
+                    <input
+                      list="owner-suggestions"
+                      value={nm.owner}
+                      onChange={e=>setNm({...nm,owner:e.target.value})}
+                      style={I}
+                      placeholder="输入或选择负责人"
+                    />
+                    <datalist id="owner-suggestions">
+                      {MEMBERS.map(m=><option key={m} value={m}/>)}
+                    </datalist>
+                  </div>
+                </div>
               </div>
               <div><label style={LB}>参与人</label><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {MEMBERS.filter(m=>m!==nm.owner).map(m=>{const on=(nm.participants||[]).includes(m);return<button key={m} onClick={()=>setNm({...nm,participants:on?nm.participants.filter(p=>p!==m):[...(nm.participants||[]),m]})} style={{...BS,background:on?"#1a1a1a":"transparent",color:on?"#fff":"#888",borderColor:on?"#1a1a1a":"#e8e5e0"}}>{m}</button>})}
@@ -179,7 +194,7 @@ function App(){
               </div>
               <div style={{display:"flex",gap:6}}>
                 <button onClick={()=>setEditMode(!editMode)} style={{...BS,color:editMode?"#1a1a1a":"#888",fontWeight:editMode?600:400}}>{editMode?"完成编辑":"编辑"}</button>
-                <button onClick={()=>del(sel.id)} style={{...BS,color:"#cf1322",borderColor:"#ff7875"}}>删除</button>
+                <button onClick={()=>archive(sel.id)} style={{...BS,color:"#8c8c8c",borderColor:"#d9d6d0"}}>归档</button>
               </div>
             </div>
 
@@ -219,7 +234,21 @@ function App(){
 
             {/* Meta */}
             <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13,color:"#888",marginBottom:24,paddingBottom:16,borderBottom:"1px solid #f0ede8"}}>
-              <span style={{display:"flex",alignItems:"center",gap:5}}><span style={{color:"#bbb",fontSize:11}}>负责人</span><Av name={sel.owner} size={18}/><span style={{color:"#555"}}>{sel.owner}</span></span>
+              <span style={{display:"flex",alignItems:"center",gap:5}}>
+                <span style={{color:"#bbb",fontSize:11}}>负责人</span>
+                {editMode?
+                  <input
+                    list="owner-edit-suggestions"
+                    value={sel.owner}
+                    onChange={e=>upd(sel.id,{owner:e.target.value})}
+                    style={{...I,fontSize:13,padding:"3px 8px",width:140}}
+                    placeholder="负责人"
+                  />
+                :<><Av name={sel.owner} size={18}/><span style={{color:"#555"}}>{sel.owner}</span></>}
+                <datalist id="owner-edit-suggestions">
+                  {MEMBERS.map(m=><option key={m} value={m}/>)}
+                </datalist>
+              </span>
               {sel.participants.length>0&&<span style={{display:"flex",alignItems:"center",gap:4}}><span style={{color:"#bbb",fontSize:11}}>参与</span>{sel.participants.map(p=><Av key={p} name={p} size={18}/>)}</span>}
             </div>
 
