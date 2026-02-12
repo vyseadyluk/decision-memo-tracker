@@ -113,7 +113,7 @@ function App(){
     }
   },[memos]);
   const sel=memos.find(m=>m.id===selId);
-  const alerts=useMemo(()=>memos.filter(m=>m.status!=="已完成"&&(overdue(m.nextReview)||soon(m.nextReview))).sort((a,b)=>(a.nextReview||"9")>(b.nextReview||"9")?1:-1),[memos]);
+  const alerts=useMemo(()=>memos.filter(m=>m.status!=="已完成"&&m.status!=="已归档"&&(overdue(m.nextReview)||soon(m.nextReview))).sort((a,b)=>(a.nextReview||"9")>(b.nextReview||"9")?1:-1),[memos]);
   const list=useMemo(()=>memos.filter(m=>fS==="all"||m.status===fS).filter(m=>fP==="all"||m.priority===fP).sort((a,b)=>{
     if(a.pinned&&!b.pinned)return -1;
     if(!a.pinned&&b.pinned)return 1;
@@ -122,6 +122,8 @@ function App(){
   const upd=(id,u)=>setMemos(ms=>ms.map(m=>m.id===id?{...m,...u}:m));
   const togglePin=id=>upd(id,{pinned:!memos.find(m=>m.id===id)?.pinned});
   const archive=(id)=>{if(!confirm("确定要归档这条 Discussion 吗？"))return;upd(id,{status:"已归档"});setSelId(null)};
+  const unarchive=id=>upd(id,{status:"讨论中"});
+  const del=(id)=>{if(!confirm("确定要永久删除这条 Discussion 吗？删除后无法恢复！"))return;setMemos(ms=>ms.filter(m=>m.id!==id));setSelId(null)};
   const addNote=()=>{if(!note.trim()||!sel)return;upd(sel.id,{notes:[...sel.notes,{id:++nid,date:TODAY,author:sel.owner,content:note.trim(),type:nType}]});setNote("");setNType("normal")};
   const addTodo=()=>{if(!todoT.trim()||!sel)return;upd(sel.id,{todos:[...sel.todos,{id:++tid,text:todoT.trim(),done:false}]});setTodoT("")};
   const togTodo=id=>sel&&upd(sel.id,{todos:sel.todos.map(t=>t.id===id?{...t,done:!t.done}:t)});
@@ -245,7 +247,12 @@ function App(){
               <div style={{display:"flex",gap:6}}>
                 <button onClick={()=>togglePin(sel.id)} style={{...BS,color:sel.pinned?"#d46b08":"#888",fontWeight:sel.pinned?600:400}}>{sel.pinned?"📌 已置顶":"📌 置顶"}</button>
                 <button onClick={()=>setEditMode(!editMode)} style={{...BS,color:editMode?"#1a1a1a":"#888",fontWeight:editMode?600:400}}>{editMode?"完成编辑":"编辑"}</button>
-                <button onClick={()=>archive(sel.id)} style={{...BS,color:"#8c8c8c",borderColor:"#d9d6d0"}}>归档</button>
+                {sel.status==="已归档"?
+                  <button onClick={()=>unarchive(sel.id)} style={{...BS,color:"#096dd9",borderColor:"#91d5ff"}}>撤销归档</button>
+                :
+                  <button onClick={()=>archive(sel.id)} style={{...BS,color:"#8c8c8c",borderColor:"#d9d6d0"}}>归档</button>
+                }
+                <button onClick={()=>del(sel.id)} style={{...BS,color:"#cf1322",borderColor:"#ff7875"}}>删除</button>
               </div>
             </div>
 
