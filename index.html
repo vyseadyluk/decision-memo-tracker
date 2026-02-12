@@ -123,8 +123,6 @@ function App(){
   const delTodo=id=>sel&&upd(sel.id,{todos:sel.todos.filter(t=>t.id!==id)});
   const delNote=id=>sel&&upd(sel.id,{notes:sel.notes.filter(n=>n.id!==id)});
   const create=()=>{if(!nm.topic.trim()||!nm.owner.trim())return;const m={id:++mid,...nm,status:"讨论中",createdAt:TODAY,todos:[],notes:[]};setMemos([m,...memos]);setSelId(m.id);setShowNew(false);setNm({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",nextReview:"",deadline:"",progress:0});setCustomOwner("")};
-  const exportData=()=>{const data=JSON.stringify(memos,null,2);const blob=new Blob([data],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`discussions-backup-${TODAY}.json`;a.click();URL.revokeObjectURL(url)};
-  const importData=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const data=JSON.parse(ev.target.result);setMemos(data);alert("数据导入成功！")}catch(err){alert("导入失败：文件格式错误")}};reader.readAsText(file)};
 
   const I={border:"1px solid #d9d6d0",borderRadius:6,padding:"7px 10px",fontSize:13,outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"inherit",background:"#fff"};
   const SL={...I,appearance:"auto"};
@@ -141,8 +139,6 @@ function App(){
         <div><h1 style={{fontSize:16,fontWeight:700,margin:0}}>Decision Discussion Tracker</h1><span style={{fontSize:12,color:"#999"}}>投资决策讨论追踪</span></div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           {alerts.length>0&&<span style={{fontSize:12,color:"#cf1322",fontWeight:500}}>🔔 {alerts.length} 条待Review</span>}
-          <button onClick={exportData} style={{...BG,padding:"5px 12px",fontSize:12}} title="导出备份">💾 导出</button>
-          <label style={{...BG,padding:"5px 12px",fontSize:12,cursor:"pointer",margin:0}} title="导入数据">📥 导入<input type="file" accept=".json" onChange={importData} style={{display:"none"}}/></label>
           <button onClick={()=>{setShowNew(true);setSelId(null)}} style={BP}>+ 新建 Discussion</button>
         </div>
       </div>
