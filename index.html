@@ -114,8 +114,13 @@ function App(){
   },[memos]);
   const sel=memos.find(m=>m.id===selId);
   const alerts=useMemo(()=>memos.filter(m=>m.status!=="已完成"&&(overdue(m.nextReview)||soon(m.nextReview))).sort((a,b)=>(a.nextReview||"9")>(b.nextReview||"9")?1:-1),[memos]);
-  const list=useMemo(()=>memos.filter(m=>fS==="all"||m.status===fS).filter(m=>fP==="all"||m.priority===fP).sort((a,b)=>PRIORITIES.indexOf(a.priority)-PRIORITIES.indexOf(b.priority)||(b.createdAt>a.createdAt?1:-1)),[memos,fS,fP]);
+  const list=useMemo(()=>memos.filter(m=>fS==="all"||m.status===fS).filter(m=>fP==="all"||m.priority===fP).sort((a,b)=>{
+    if(a.pinned&&!b.pinned)return -1;
+    if(!a.pinned&&b.pinned)return 1;
+    return PRIORITIES.indexOf(a.priority)-PRIORITIES.indexOf(b.priority)||(b.createdAt>a.createdAt?1:-1);
+  }),[memos,fS,fP]);
   const upd=(id,u)=>setMemos(ms=>ms.map(m=>m.id===id?{...m,...u}:m));
+  const togglePin=id=>upd(id,{pinned:!memos.find(m=>m.id===id)?.pinned});
   const archive=(id)=>{if(!confirm("确定要归档这条 Discussion 吗？"))return;upd(id,{status:"已归档"});setSelId(null)};
   const addNote=()=>{if(!note.trim()||!sel)return;upd(sel.id,{notes:[...sel.notes,{id:++nid,date:TODAY,author:sel.owner,content:note.trim(),type:nType}]});setNote("");setNType("normal")};
   const addTodo=()=>{if(!todoT.trim()||!sel)return;upd(sel.id,{todos:[...sel.todos,{id:++tid,text:todoT.trim(),done:false}]});setTodoT("")};
@@ -164,13 +169,20 @@ function App(){
                 style={{padding:"14px 16px",borderBottom:"1px solid #f0ede8",cursor:"pointer",background:selId===m.id?"#f5f3ef":"transparent",transition:"background 0.1s"}}
                 onMouseEnter={e=>{if(selId!==m.id)e.currentTarget.style.background="#faf8f5"}}
                 onMouseLeave={e=>{if(selId!==m.id)e.currentTarget.style.background="transparent"}}>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
-                  <Tag color={PM[m.priority].c} bg={PM[m.priority].b}>{m.priority}</Tag>
-                  <Tag color={SM[m.status].c} bg={SM[m.status].b}>{SM[m.status].i} {m.status}</Tag>
-                  {(overdue(m.nextReview)||soon(m.nextReview))&&m.status!=="已完成"&&<span style={{fontSize:10,color:"#cf1322"}}>⏰</span>}
+                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6,justifyContent:"space-between"}}>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <Tag color={PM[m.priority].c} bg={PM[m.priority].b}>{m.priority}</Tag>
+                    <Tag color={SM[m.status].c} bg={SM[m.status].b}>{SM[m.status].i} {m.status}</Tag>
+                    {(overdue(m.nextReview)||soon(m.nextReview))&&m.status!=="已完成"&&<span style={{fontSize:10,color:"#cf1322"}}>⏰</span>}
+                  </div>
+                  <button onClick={e=>{e.stopPropagation();togglePin(m.id)}} style={{background:"transparent",border:"none",fontSize:14,cursor:"pointer",padding:"2px 4px",opacity:m.pinned?1:0.3}} title={m.pinned?"取消置顶":"置顶"}>📌</button>
                 </div>
-                <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a",marginBottom:8,lineHeight:1.4}}>{m.topic}</div>
+                <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a",marginBottom:8,lineHeight:1.4,display:"flex",alignItems:"center",gap:6}}>
+                  {m.pinned&&<span style={{fontSize:12,color:"#d46b08"}}>📌</span>}
+                  <span>{m.topic}</span>
+                </div>
                 <div style={{marginBottom:8}}><PBar value={m.progress} editable={false}/></div>
+                <div style={{fontSize:11,color:"#bbb",marginBottom:6}}>创建于 {m.createdAt}</div>
                 <div style={{display:"flex",gap:6,alignItems:"center",fontSize:12,color:"#999",flexWrap:"wrap"}}>
                   <span style={{display:"flex",alignItems:"center",gap:4}}><Av name={m.owner} size={16}/>{m.owner.split(" ")[0]}</span>
                   {m.nextReview&&<DateTag date={m.nextReview} label="Review" icon="⏰"/>}
@@ -231,6 +243,7 @@ function App(){
                 <select value={sel.status} onChange={e=>upd(sel.id,{status:e.target.value})} style={{border:"none",fontSize:11,fontWeight:600,color:SM[sel.status].c,background:SM[sel.status].b,borderRadius:3,padding:"2px 8px",cursor:"pointer",outline:"none"}}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
               </div>
               <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>togglePin(sel.id)} style={{...BS,color:sel.pinned?"#d46b08":"#888",fontWeight:sel.pinned?600:400}}>{sel.pinned?"📌 已置顶":"📌 置顶"}</button>
                 <button onClick={()=>setEditMode(!editMode)} style={{...BS,color:editMode?"#1a1a1a":"#888",fontWeight:editMode?600:400}}>{editMode?"完成编辑":"编辑"}</button>
                 <button onClick={()=>archive(sel.id)} style={{...BS,color:"#8c8c8c",borderColor:"#d9d6d0"}}>归档</button>
               </div>
