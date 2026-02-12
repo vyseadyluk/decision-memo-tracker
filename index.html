@@ -27,16 +27,16 @@ const PM={"重要且紧急":{c:"#cf1322",b:"rgba(207,19,34,0.08)"},"重要不紧
 const SM={"讨论中":{c:"#d46b08",b:"rgba(212,107,8,0.07)",i:"◌"},"执行中":{c:"#096dd9",b:"rgba(9,109,217,0.07)",i:"▸"},"已完成":{c:"#389e0d",b:"rgba(56,158,13,0.07)",i:"✓"},"已归档":{c:"#8c8c8c",b:"rgba(140,140,140,0.06)",i:"□"}};
 
 const INIT=[
-  {id:1,topic:"新兴市场敞口是否需要减仓至10%以下",conclusion:"分两批减仓至8%，保留5%底仓。第一批已完成，当前敞口11.2%。",limitingFactor:"尾盘流动性不足，大额减仓需分批执行，TWAP算法待上线。",priority:"重要且紧急",status:"执行中",progress:65,owner:"Alice Chen",participants:["Bob Wang","Carol Li"],nextReview:"2026-02-14",createdAt:"2026-01-10",deadline:"2026-02-28",
+  {id:1,topic:"新兴市场敞口是否需要减仓至10%以下",conclusion:"分两批减仓至8%，保留5%底仓。第一批已完成，当前敞口11.2%。",limitingFactor:"尾盘流动性不足，大额减仓需分批执行，TWAP算法待上线。",priority:"重要且紧急",status:"执行中",progress:65,owner:"Alice Chen",_participants:["Bob Wang","Carol Li"],nextReview:"2026-02-14",createdAt:"2026-01-10",deadline:"2026-02-28",
     todos:[{id:1,text:"通知交易台准备减仓指令",done:true},{id:2,text:"确认流动性窗口",done:true},{id:3,text:"执行第二批减仓",done:false},{id:4,text:"更新持仓报告",done:false}],
     notes:[{id:1,date:"2026-01-10",author:"Alice Chen",content:"新兴市场波动率突破90%分位，建议讨论是否减仓。当前敞口15%。",type:"normal"},{id:2,date:"2026-01-12",author:"Bob Wang",content:"同意减仓方向，但建议分批执行，避免冲击成本。目标10%以下。",type:"normal"},{id:3,date:"2026-01-15",author:"Carol Li",content:"估值已处低位，完全退出可能错过反弹。建议保留5%底仓。",type:"normal"},{id:4,date:"2026-01-18",author:"Alice Chen",content:"团队一致同意：分两批减仓至8%，保留底仓。第一批本周执行。",type:"decision"},{id:5,date:"2026-01-25",author:"Bob Wang",content:"第一批减仓完成，当前敞口11.2%。市场继续下行，验证了减仓判断。",type:"update"}]},
-  {id:2,topic:"固收久期策略：是否延长至3.5年",conclusion:"折中方案：目标久期3.2，分步调整。先到2.8观察一周。",limitingFactor:"合适久期的品种供给有限，需等待一级市场发行窗口。",priority:"重要不紧急",status:"执行中",progress:40,owner:"Bob Wang",participants:["Alice Chen","David Zhou"],nextReview:"2026-02-20",createdAt:"2026-01-20",deadline:"2026-03-15",
+  {id:2,topic:"固收久期策略：是否延长至3.5年",conclusion:"折中方案：目标久期3.2，分步调整。先到2.8观察一周。",limitingFactor:"合适久期的品种供给有限，需等待一级市场发行窗口。",priority:"重要不紧急",status:"执行中",progress:40,owner:"Bob Wang",_participants:["Alice Chen","David Zhou"],nextReview:"2026-02-20",createdAt:"2026-01-20",deadline:"2026-03-15",
     todos:[{id:1,text:"筛选合适的长久期品种",done:false},{id:2,text:"计算组合久期影响测算",done:true}],
     notes:[{id:1,date:"2026-01-20",author:"Bob Wang",content:"利率见顶信号增强，建议将组合久期从2.1延长至3.5。预计可提升收益50bps。",type:"normal"},{id:2,date:"2026-01-22",author:"David Zhou",content:"3.5激进了，通胀韧性仍在。建议折中到3.0，留有余地。",type:"normal"},{id:3,date:"2026-01-28",author:"Bob Wang",content:"折中方案：目标久期3.2，分步调整。先到2.8观察一周再决定后续。",type:"decision"}]},
-  {id:3,topic:"科技板块集中度超限处理方案",conclusion:"",limitingFactor:"期权对冲成本较高（约0.8%），直接减仓可能造成价格冲击。",priority:"重要且紧急",status:"讨论中",progress:0,owner:"Carol Li",participants:["Alice Chen","Eva Liu"],nextReview:"2026-02-12",createdAt:"2026-02-05",deadline:"2026-02-15",
+  {id:3,topic:"科技板块集中度超限处理方案",conclusion:"",limitingFactor:"期权对冲成本较高（约0.8%），直接减仓可能造成价格冲击。",priority:"重要且紧急",status:"讨论中",progress:0,owner:"Carol Li",_participants:["Alice Chen","Eva Liu"],nextReview:"2026-02-12",createdAt:"2026-02-05",deadline:"2026-02-15",
     todos:[],
     notes:[{id:1,date:"2026-02-05",author:"Carol Li",content:"科技板块占比已达37%，超过35%风控上限。需要尽快处理。",type:"normal"},{id:2,date:"2026-02-06",author:"Eva Liu",content:"建议对比两个方案：直接减仓 vs 用期权对冲。期权成本约0.8%。",type:"normal"}]},
-  {id:4,topic:"Q2 大类资产再平衡计划",conclusion:"",limitingFactor:"Q1数据尚未出完，需等待2月底宏观数据确认方向。",priority:"不重要但紧急",status:"讨论中",progress:0,owner:"David Zhou",participants:["Bob Wang","Carol Li","Eva Liu"],nextReview:"2026-03-01",createdAt:"2026-02-01",deadline:"2026-04-01",
+  {id:4,topic:"Q2 大类资产再平衡计划",conclusion:"",limitingFactor:"Q1数据尚未出完，需等待2月底宏观数据确认方向。",priority:"不重要但紧急",status:"讨论中",progress:0,owner:"David Zhou",_participants:["Bob Wang","Carol Li","Eva Liu"],nextReview:"2026-03-01",createdAt:"2026-02-01",deadline:"2026-04-01",
     todos:[{id:1,text:"准备Q1回顾报告",done:false}],
     notes:[{id:1,date:"2026-02-01",author:"David Zhou",content:"Q2再平衡窗口在4月初，提前一个月开始讨论方向。初步想法：增配商品、减配成长股。",type:"normal"}]}
 ];
@@ -79,7 +79,7 @@ function App(){
   const[nType,setNType]=useState("normal");
   const[todoT,setTodoT]=useState("");
   const[customOwner,setCustomOwner]=useState("");
-  const[nm,setNm]=useState({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",participants:[],nextReview:"",deadline:"",progress:0});
+  const[nm,setNm]=useState({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",nextReview:"",deadline:"",progress:0});
 
   React.useEffect(()=>{
     try{
@@ -98,7 +98,7 @@ function App(){
   const togTodo=id=>sel&&upd(sel.id,{todos:sel.todos.map(t=>t.id===id?{...t,done:!t.done}:t)});
   const delTodo=id=>sel&&upd(sel.id,{todos:sel.todos.filter(t=>t.id!==id)});
   const delNote=id=>sel&&upd(sel.id,{notes:sel.notes.filter(n=>n.id!==id)});
-  const create=()=>{if(!nm.topic.trim()||!nm.owner.trim())return;const m={id:++mid,...nm,status:"讨论中",createdAt:TODAY,todos:[],notes:[]};setMemos([m,...memos]);setSelId(m.id);setShowNew(false);setNm({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",participants:[],nextReview:"",deadline:"",progress:0});setCustomOwner("")};
+  const create=()=>{if(!nm.topic.trim()||!nm.owner.trim())return;const m={id:++mid,...nm,status:"讨论中",createdAt:TODAY,todos:[],notes:[]};setMemos([m,...memos]);setSelId(m.id);setShowNew(false);setNm({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",nextReview:"",deadline:"",progress:0});setCustomOwner("")};
   const exportData=()=>{const data=JSON.stringify(memos,null,2);const blob=new Blob([data],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`discussions-backup-${TODAY}.json`;a.click();URL.revokeObjectURL(url)};
   const importData=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const data=JSON.parse(ev.target.result);setMemos(data);alert("数据导入成功！")}catch(err){alert("导入失败：文件格式错误")}};reader.readAsText(file)};
 
@@ -190,9 +190,6 @@ function App(){
                   </div>
                 </div>
               </div>
-              <div><label style={LB}>参与人</label><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {MEMBERS.filter(m=>m!==nm.owner).map(m=>{const on=(nm.participants||[]).includes(m);return<button key={m} onClick={()=>setNm({...nm,participants:on?nm.participants.filter(p=>p!==m):[...(nm.participants||[]),m]})} style={{...BS,background:on?"#1a1a1a":"transparent",color:on?"#fff":"#888",borderColor:on?"#1a1a1a":"#e8e5e0"}}>{m}</button>})}
-              </div></div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                 <div><label style={LB}>截止日期</label><input type="date" value={nm.deadline||""} onChange={e=>setNm({...nm,deadline:e.target.value})} style={I}/></div>
                 <div><label style={LB}>下次 Review</label><input type="date" value={nm.nextReview} onChange={e=>setNm({...nm,nextReview:e.target.value})} style={I}/></div>
@@ -269,7 +266,6 @@ function App(){
                   {MEMBERS.map(m=><option key={m} value={m}/>)}
                 </datalist>
               </span>
-              {sel.participants.length>0&&<span style={{display:"flex",alignItems:"center",gap:4}}><span style={{color:"#bbb",fontSize:11}}>参与</span>{sel.participants.map(p=><Av key={p} name={p} size={18}/>)}</span>}
             </div>
 
             {/* Todos */}
