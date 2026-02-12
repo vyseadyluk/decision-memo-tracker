@@ -84,13 +84,45 @@ const PBar=({value,onChange,editable=true})=>{
   </div>
 };
 
+const checkStorageAvailable=()=>{
+  try{
+    const test='__storage_test__';
+    localStorage.setItem(test,test);
+    localStorage.removeItem(test);
+    return true;
+  }catch(e){
+    return false;
+  }
+};
+
 function App(){
+  const[storageAvailable]=useState(checkStorageAvailable);
+  const[saveStatus,setSaveStatus]=useState("saved");
   const[memos,setMemos]=useState(()=>{
     try{
       const saved=localStorage.getItem("decision-discussions");
-      return saved?JSON.parse(saved):INIT;
+      if(saved)return JSON.parse(saved);
+
+      const backup=localStorage.getItem("decision-discussions-backup");
+      if(backup){
+        const parsed=JSON.parse(backup);
+        console.warn("Restored from backup!");
+        return parsed.data||parsed;
+      }
+
+      return INIT;
     }catch(e){
       console.error("Failed to load data:",e);
+      try{
+        const backup=localStorage.getItem("decision-discussions-backup");
+        if(backup){
+          const parsed=JSON.parse(backup);
+          alert("主数据损坏，已从备份恢复！");
+          return parsed.data||parsed;
+        }
+      }catch(backupErr){
+        console.error("Backup also failed:",backupErr);
+      }
       return INIT;
     }
   });
@@ -106,10 +138,16 @@ function App(){
   const[nm,setNm]=useState({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",nextReview:"",deadline:"",progress:0});
 
   React.useEffect(()=>{
+    setSaveStatus("saving");
     try{
       localStorage.setItem("decision-discussions",JSON.stringify(memos));
+      const backup={data:memos,timestamp:Date.now(),version:"1.0"};
+      localStorage.setItem("decision-discussions-backup",JSON.stringify(backup));
+      setSaveStatus("saved");
+      setTimeout(()=>setSaveStatus("idle"),2000);
     }catch(e){
       console.error("Failed to save data:",e);
+      setSaveStatus("error");
     }
   },[memos]);
   const sel=memos.find(m=>m.id===selId);
@@ -130,6 +168,7 @@ function App(){
   const delTodo=id=>sel&&upd(sel.id,{todos:sel.todos.filter(t=>t.id!==id)});
   const delNote=id=>sel&&upd(sel.id,{notes:sel.notes.filter(n=>n.id!==id)});
   const create=()=>{if(!nm.topic.trim()||!nm.owner.trim())return;const m={id:++mid,...nm,status:"讨论中",createdAt:TODAY,todos:[],notes:[]};setMemos([m,...memos]);setSelId(m.id);setShowNew(false);setNm({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",nextReview:"",deadline:"",progress:0});setCustomOwner("")};
+  const exportBackup=()=>{const data=JSON.stringify(memos,null,2);const blob=new Blob([data],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`discussions-backup-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;a.click();URL.revokeObjectURL(url)};
 
   const I={border:"1px solid #d9d6d0",borderRadius:6,padding:"7px 10px",fontSize:13,outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"inherit",background:"#fff"};
   const SL={...I,appearance:"auto"};
@@ -142,10 +181,18 @@ function App(){
 
   return(
     <div style={{background:"#fafaf9",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      {!storageAvailable&&<div style={{background:"#fff1f0",border:"1px solid #ff7875",borderLeft:"none",borderRight:"none",padding:"12px 24px",color:"#cf1322",fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span>⚠️ <strong>警告</strong>：浏览器私密模式或localStorage不可用，数据将在会话结束后丢失！</span>
+        <button onClick={exportBackup} style={{...BP,background:"#cf1322",fontSize:12,padding:"5px 12px"}}>立即导出备份</button>
+      </div>}
       <div style={{padding:"14px 24px",borderBottom:"1px solid #e8e5e0",background:"#fff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div><h1 style={{fontSize:16,fontWeight:700,margin:0}}>Decision Discussion Tracker</h1><span style={{fontSize:12,color:"#999"}}>投资决策讨论追踪</span></div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {saveStatus==="saved"&&<span style={{fontSize:11,color:"#52c41a"}}>✓ 已保存</span>}
+          {saveStatus==="saving"&&<span style={{fontSize:11,color:"#faad14"}}>⏳ 保存中...</span>}
+          {saveStatus==="error"&&<span style={{fontSize:11,color:"#cf1322"}}>✗ 保存失败</span>}
           {alerts.length>0&&<span style={{fontSize:12,color:"#cf1322",fontWeight:500}}>🔔 {alerts.length} 条待Review</span>}
+          <button onClick={exportBackup} style={{...BG,padding:"5px 12px",fontSize:12,color:storageAvailable?"#666":"#cf1322",fontWeight:storageAvailable?400:600}}>{storageAvailable?"💾 备份":"⚠️ 立即备份"}</button>
           <button onClick={()=>{setShowNew(true);setSelId(null)}} style={BP}>+ 新建 Discussion</button>
         </div>
       </div>
