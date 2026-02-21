@@ -84,6 +84,128 @@ const PBar=({value,onChange,editable=true})=>{
   </div>
 };
 
+// StorageManager: 统一存储抽象层，支持文件系统/IndexedDB/localStorage
+const StorageManager={
+  type:null,
+  fileHandle:null,
+
+  async init(){
+    if('showSaveFilePicker' in window){
+      const handle=await this.getStoredFileHandle();
+      if(handle){
+        this.fileHandle=handle;
+        this.type='filesystem';
+        return{success:true,type:'filesystem'};
+      }
+      return await this.setupFileSystem();
+    }else{
+      this.type='indexeddb';
+      await this.setupIndexedDB();
+      return{success:true,type:'indexeddb'};
+    }
+  },
+
+  async setupFileSystem(){
+    try{
+      const handle=await window.showSaveFilePicker({
+        suggestedName:'decision-tracker-data.json',
+        types:[{description:'Decision Tracker Data',accept:{'application/json':['.json']}}]
+      });
+      this.fileHandle=handle;
+      await this.storeFileHandle(handle);
+      this.type='filesystem';
+      return{success:true,type:'filesystem'};
+    }catch(e){
+      return{success:false,error:'user_cancelled'};
+    }
+  },
+
+  async save(data){
+    if(this.type==='filesystem'&&this.fileHandle){
+      const writable=await this.fileHandle.createWritable();
+      await writable.write(JSON.stringify(data,null,2));
+      await writable.close();
+    }else if(this.type==='indexeddb'){
+      const db=await this.openDB();
+      return new Promise((resolve,reject)=>{
+        const tx=db.transaction('data','readwrite');
+        const store=tx.objectStore('data');
+        store.put(data,'memos');
+        tx.oncomplete=()=>resolve();
+        tx.onerror=()=>reject(tx.error);
+      });
+    }else{
+      localStorage.setItem('decision-discussions',JSON.stringify(data));
+    }
+  },
+
+  async load(){
+    if(this.type==='filesystem'&&this.fileHandle){
+      const file=await this.fileHandle.getFile();
+      const text=await file.text();
+      return JSON.parse(text);
+    }else if(this.type==='indexeddb'){
+      const db=await this.openDB();
+      return new Promise((resolve,reject)=>{
+        const tx=db.transaction('data','readonly');
+        const store=tx.objectStore('data');
+        const req=store.get('memos');
+        req.onsuccess=()=>resolve(req.result||null);
+        req.onerror=()=>reject(req.error);
+      });
+    }else{
+      const saved=localStorage.getItem('decision-discussions');
+      return saved?JSON.parse(saved):null;
+    }
+  },
+
+  async storeFileHandle(handle){
+    const db=await this.openDB();
+    const tx=db.transaction('settings','readwrite');
+    await tx.objectStore('settings').put(handle,'fileHandle');
+  },
+
+  async getStoredFileHandle(){
+    try{
+      const db=await this.openDB();
+      const tx=db.transaction('settings','readonly');
+      const handle=await tx.objectStore('settings').get('fileHandle');
+      if(handle){
+        const permission=await handle.queryPermission({mode:'readwrite'});
+        if(permission==='granted')return handle;
+        if(permission==='prompt'){
+          const requested=await handle.requestPermission({mode:'readwrite'});
+          if(requested==='granted')return handle;
+        }
+      }
+    }catch(e){
+      console.error('Failed to restore file handle:',e);
+    }
+    return null;
+  },
+
+  async openDB(){
+    return new Promise((resolve,reject)=>{
+      const request=indexedDB.open('DecisionTrackerDB',1);
+      request.onerror=()=>reject(request.error);
+      request.onsuccess=()=>resolve(request.result);
+      request.onupgradeneeded=(event)=>{
+        const db=event.target.result;
+        if(!db.objectStoreNames.contains('settings')){
+          db.createObjectStore('settings');
+        }
+        if(!db.objectStoreNames.contains('data')){
+          db.createObjectStore('data');
+        }
+      };
+    });
+  },
+
+  async setupIndexedDB(){
+    await this.openDB();
+  }
+};
+
 const checkStorageAvailable=()=>{
   try{
     const test='__storage_test__';
@@ -98,34 +220,10 @@ const checkStorageAvailable=()=>{
 function App(){
   const[storageAvailable]=useState(checkStorageAvailable);
   const[saveStatus,setSaveStatus]=useState("saved");
-  const[memos,setMemos]=useState(()=>{
-    try{
-      const saved=localStorage.getItem("decision-discussions");
-      if(saved)return JSON.parse(saved);
-
-      const backup=localStorage.getItem("decision-discussions-backup");
-      if(backup){
-        const parsed=JSON.parse(backup);
-        console.warn("Restored from backup!");
-        return parsed.data||parsed;
-      }
-
-      return INIT;
-    }catch(e){
-      console.error("Failed to load data:",e);
-      try{
-        const backup=localStorage.getItem("decision-discussions-backup");
-        if(backup){
-          const parsed=JSON.parse(backup);
-          alert("主数据损坏，已从备份恢复！");
-          return parsed.data||parsed;
-        }
-      }catch(backupErr){
-        console.error("Backup also failed:",backupErr);
-      }
-      return INIT;
-    }
-  });
+  const[storageReady,setStorageReady]=useState(false);
+  const[storageType,setStorageType]=useState(null);
+  const[showStorageSetup,setShowStorageSetup]=useState(false);
+  const[memos,setMemos]=useState([]);
   const[selId,setSelId]=useState(null);
   const[fS,setFS]=useState("all");
   const[fP,setFP]=useState("all");
@@ -138,18 +236,50 @@ function App(){
   const[nm,setNm]=useState({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",nextReview:"",deadline:"",progress:0});
 
   React.useEffect(()=>{
-    setSaveStatus("saving");
-    try{
-      localStorage.setItem("decision-discussions",JSON.stringify(memos));
-      const backup={data:memos,timestamp:Date.now(),version:"1.0"};
-      localStorage.setItem("decision-discussions-backup",JSON.stringify(backup));
-      setSaveStatus("saved");
-      setTimeout(()=>setSaveStatus("idle"),2000);
-    }catch(e){
-      console.error("Failed to save data:",e);
-      setSaveStatus("error");
+    async function initStorage(){
+      const result=await StorageManager.init();
+      if(result.success){
+        const data=await StorageManager.load();
+        if(data){
+          setMemos(data);
+        }else{
+          const legacy=localStorage.getItem('decision-discussions');
+          if(legacy){
+            const parsed=JSON.parse(legacy);
+            setMemos(parsed);
+            await StorageManager.save(parsed);
+            console.log('✓ Migrated from localStorage');
+          }else{
+            setMemos(INIT);
+          }
+        }
+        setStorageType(result.type);
+        setStorageReady(true);
+      }else{
+        setShowStorageSetup(true);
+        setMemos(INIT);
+        setStorageReady(true);
+      }
     }
-  },[memos]);
+    initStorage();
+  },[]);
+
+  React.useEffect(()=>{
+    if(!storageReady)return;
+    setSaveStatus("saving");
+    async function save(){
+      try{
+        await StorageManager.save(memos);
+        setSaveStatus("saved");
+        setTimeout(()=>setSaveStatus("idle"),2000);
+      }catch(e){
+        console.error("Save failed:",e);
+        setSaveStatus("error");
+        alert('保存失败：'+e.message+'\n请尝试导出备份');
+      }
+    }
+    save();
+  },[memos,storageReady]);
   const sel=memos.find(m=>m.id===selId);
   const alerts=useMemo(()=>memos.filter(m=>m.status!=="已完成"&&m.status!=="已归档"&&(overdue(m.nextReview)||soon(m.nextReview))).sort((a,b)=>(a.nextReview||"9")>(b.nextReview||"9")?1:-1),[memos]);
   const list=useMemo(()=>memos.filter(m=>fS==="all"||m.status===fS).filter(m=>fP==="all"||m.priority===fP).sort((a,b)=>{
@@ -170,6 +300,35 @@ function App(){
   const create=()=>{if(!nm.topic.trim()||!nm.owner.trim())return;const m={id:++mid,...nm,status:"讨论中",createdAt:TODAY,todos:[],notes:[]};setMemos([m,...memos]);setSelId(m.id);setShowNew(false);setNm({topic:"",conclusion:"",limitingFactor:"",priority:PRIORITIES[0],owner:"",nextReview:"",deadline:"",progress:0});setCustomOwner("")};
   const exportBackup=()=>{const data=JSON.stringify(memos,null,2);const blob=new Blob([data],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`discussions-backup-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;a.click();URL.revokeObjectURL(url)};
 
+  const importBackup=()=>{
+    const input=document.createElement('input');
+    input.type='file';
+    input.accept='application/json';
+    input.onchange=async(e)=>{
+      try{
+        const file=e.target.files[0];
+        if(!file)return;
+        const text=await file.text();
+        const data=JSON.parse(text);
+        if(confirm(`确定要导入 ${data.length} 条数据吗？当前数据将被覆盖。`)){
+          setMemos(data);
+          alert('✓ 数据已成功导入！');
+        }
+      }catch(e){
+        alert('✗ 导入失败：'+e.message);
+      }
+    };
+    input.click();
+  };
+
+  React.useEffect(()=>{
+    if(storageType!=='indexeddb'&&storageType!=='localstorage')return;
+    const interval=setInterval(()=>{
+      exportBackup();
+    },30*60*1000);
+    return()=>clearInterval(interval);
+  },[storageType,memos]);
+
   const I={border:"1px solid #d9d6d0",borderRadius:6,padding:"7px 10px",fontSize:13,outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"inherit",background:"#fff"};
   const SL={...I,appearance:"auto"};
   const TA={...I,minHeight:48,resize:"vertical",lineHeight:1.5};
@@ -185,14 +344,21 @@ function App(){
         <span>⚠️ <strong>警告</strong>：浏览器私密模式或localStorage不可用，数据将在会话结束后丢失！</span>
         <button onClick={exportBackup} style={{...BP,background:"#cf1322",fontSize:12,padding:"5px 12px"}}>立即导出备份</button>
       </div>}
+      {(storageType==='indexeddb'||storageType==='localstorage')&&<div style={{background:"#fff7e6",border:"1px solid #ffd591",borderLeft:"none",borderRight:"none",padding:"10px 24px",fontSize:12,color:"#d46b08"}}>
+        ⚠️ 当前使用浏览器存储模式。数据可能在清除缓存或切换 Profile 时丢失。建议定期使用"导出备份"按钮保存数据。
+        <button onClick={()=>setShowStorageSetup(true)} style={{...BS,marginLeft:12,fontSize:11,color:"#d46b08"}}>切换到文件保存模式</button>
+      </div>}
       <div style={{padding:"14px 24px",borderBottom:"1px solid #e8e5e0",background:"#fff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div><h1 style={{fontSize:16,fontWeight:700,margin:0}}>Decision Discussion Tracker</h1><span style={{fontSize:12,color:"#999"}}>投资决策讨论追踪</span></div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           {saveStatus==="saved"&&<span style={{fontSize:11,color:"#52c41a"}}>✓ 已保存</span>}
           {saveStatus==="saving"&&<span style={{fontSize:11,color:"#faad14"}}>⏳ 保存中...</span>}
           {saveStatus==="error"&&<span style={{fontSize:11,color:"#cf1322"}}>✗ 保存失败</span>}
+          {storageType==='filesystem'&&<span style={{fontSize:11,color:"#096dd9",display:"flex",alignItems:"center",gap:4}}>💾 文件保存<button onClick={()=>setShowStorageSetup(true)} style={{...BS,padding:"2px 6px",fontSize:10}}>更改位置</button></span>}
+          {storageType==='indexeddb'&&<span style={{fontSize:11,color:"#faad14"}}>⚠️ 浏览器存储模式</span>}
           {alerts.length>0&&<span style={{fontSize:12,color:"#cf1322",fontWeight:500}}>🔔 {alerts.length} 条待Review</span>}
-          <button onClick={exportBackup} style={{...BG,padding:"5px 12px",fontSize:12,color:storageAvailable?"#666":"#cf1322",fontWeight:storageAvailable?400:600}}>{storageAvailable?"💾 备份":"⚠️ 立即备份"}</button>
+          <button onClick={exportBackup} style={{...BG,padding:"5px 12px",fontSize:12}}>💾 导出备份</button>
+          <button onClick={importBackup} style={{...BG,padding:"5px 12px",fontSize:12}}>📥 导入</button>
           <button onClick={()=>{setShowNew(true);setSelId(null)}} style={BP}>+ 新建 Discussion</button>
         </div>
       </div>
@@ -411,6 +577,29 @@ function App(){
           </div>}
         </div>
       </div>
+
+      {/* Storage Setup Modal */}
+      {showStorageSetup&&<div onClick={()=>setShowStorageSetup(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:12,padding:32,width:520,maxWidth:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.12)"}}>
+          <h2 style={{fontSize:20,fontWeight:700,marginBottom:16}}>💾 选择数据保存位置</h2>
+          <p style={{fontSize:14,color:"#666",lineHeight:1.6,marginBottom:20}}>为了确保数据不会因浏览器缓存清除或切换 Profile 而丢失，请选择一个文件夹来保存您的数据。</p>
+          <div style={{background:"#f5f5f5",padding:16,borderRadius:8,marginBottom:20}}>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>推荐保存位置：</div>
+            <ul style={{margin:0,paddingLeft:20,fontSize:13,color:"#666"}}>
+              <li>文档文件夹（~/Documents）</li>
+              <li>桌面（~/Desktop）</li>
+              <li>云盘同步文件夹（Dropbox、OneDrive 等）</li>
+            </ul>
+          </div>
+          <div style={{background:"#e6f7ff",border:"1px solid #91d5ff",padding:12,borderRadius:6,marginBottom:20}}>
+            <div style={{fontSize:12,color:"#096dd9"}}>💡 <strong>提示：</strong>选择云盘文件夹可以自动在多台电脑间同步数据</div>
+          </div>
+          <div style={{display:"flex",gap:12,justifyContent:"flex-end"}}>
+            <button onClick={()=>{StorageManager.type='indexeddb';setStorageType('indexeddb');setShowStorageSetup(false)}} style={BG}>暂时跳过（使用浏览器存储）</button>
+            <button onClick={async()=>{const result=await StorageManager.setupFileSystem();if(result.success){setStorageType('filesystem');setShowStorageSetup(false);if(memos.length>0){await StorageManager.save(memos)}}}} style={BP}>选择保存位置</button>
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }
